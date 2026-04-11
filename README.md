@@ -68,9 +68,9 @@ wp fc2 import https://example.blog.fc2.com/ --with-images --reset
 1. FC2ブログのトップページからサイドバーの月別アーカイブ URL を収集
 2. 各月別アーカイブページから記事 URL（`blog-entry-*.html`）を収集
 3. 各記事ページをパースしてタイトル・本文・日付・カテゴリー・タグを取得
-4. 本文 HTML を Gutenberg ブロックに変換して `wp post create` で投稿
+4. 本文 HTML を Gutenberg ブロックに変換して WordPress に投稿
 5. `--with-images` 指定時: FC2 CDN 画像をダウンロードしてメディア登録・URL 置換
-6. `--with-comments` 指定時: コメントを `wp comment create` で登録
+6. `--with-comments` 指定時: コメントを登録
 7. 進捗を `/wp-content/fc2blog2wp/<blog-id>/progress.json` に保存
 
 ## ファイル構成
@@ -85,6 +85,21 @@ fc2blog2wp/
 ├── SPEC.md                     # 仕様書
 └── README.md
 ```
+
+## 変更履歴
+
+### 0.2.0
+
+- `exec()` + WP-CLI 子プロセス呼び出しを WordPress API に置き換え
+  - `wp_insert_post()` で記事を作成するよう変更
+  - `media_handle_sideload()` で画像をメディアライブラリへ登録するよう変更
+  - `wp_update_post()` で記事を更新するよう変更
+  - `wp_insert_comment()` でコメントを登録するよう変更
+- エックスサーバー等の環境で `escapeshellarg()` がシェルのロケール依存でマルチバイト文字を消去し、タイトルが `(no title)` になる問題を修正
+
+### 0.1.0
+
+- 初回リリース
 
 ## ライセンス
 

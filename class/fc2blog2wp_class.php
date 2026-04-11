@@ -396,55 +396,51 @@ class FC2Blog2WP {
 			$slug = 'fc2-entry-' . $m[1];
 		}
 
-		$this->putTempFile( $postData['content'] );
-		$temp_file = $this->tempDir . '/tmp.txt';
-
-		$cmd = 'wp post create ' . escapeshellarg( $temp_file ) .
-			' --post_title=' . escapeshellarg( $postData['title'] ) .
-			' --post_type=post' .
-			' --post_status=' . escapeshellarg( isset( $postData['status'] ) ? $postData['status'] : 'publish' ) .
-			' --post_date=' . escapeshellarg( $postData['date'] );
+		$post_args = array(
+			'post_title'   => $postData['title'],
+			'post_content' => $postData['content'],
+			'post_type'    => 'post',
+			'post_status'  => isset( $postData['status'] ) ? $postData['status'] : 'publish',
+			'post_date'    => $postData['date'],
+		);
 
 		if ( $slug ) {
-			$cmd .= ' --post_name=' . escapeshellarg( $slug );
+			$post_args['post_name'] = $slug;
 		}
 
 		if ( ! empty( $postData['excerpt'] ) ) {
-			$cmd .= ' --post_excerpt=' . escapeshellarg( $postData['excerpt'] );
+			$post_args['post_excerpt'] = $postData['excerpt'];
 		}
 
-		$cmd .= ' --porcelain 2>/dev/null';
+		$post_id = wp_insert_post( $post_args );
 
-		$output = [];
-		exec( $cmd, $output );
-
-		$postId = null;
-		foreach ( $output as $line ) {
-			if ( is_numeric( trim( $line ) ) ) {
-				$postId = trim( $line );
-				break;
-			}
-		}
-
-		if ( ! $postId ) {
+		if ( is_wp_error( $post_id ) || ! $post_id ) {
 			return false;
 		}
 
-		// Set category
+		// Set category.
 		if ( ! empty( $postData['category'] ) ) {
-			exec( 'wp post term set ' . $postId . ' category ' . escapeshellarg( $postData['category'] ) . ' 2>/dev/null' );
+			$category = get_term_by( 'name', $postData['category'], 'category' );
+			if ( $category ) {
+				$cat_id = $category->term_id;
+			} else {
+				$result = wp_insert_term( $postData['category'], 'category' );
+				$cat_id = ! is_wp_error( $result ) ? $result['term_id'] : 0;
+			}
+			if ( $cat_id ) {
+				wp_set_post_categories( $post_id, array( $cat_id ) );
+			}
 		}
 
-		// Set tags
+		// Set tags.
 		if ( ! empty( $postData['tags'] ) ) {
-			$tag_args = implode( ' ', array_map( 'escapeshellarg', $postData['tags'] ) );
-			exec( 'wp post term set ' . $postId . ' post_tag ' . $tag_args . ' 2>/dev/null' );
+			wp_set_post_tags( $post_id, $postData['tags'] );
 		}
 
-		// Save original URL as custom field
-		exec( 'wp post meta set ' . $postId . ' original_url ' . escapeshellarg( $postData['original_url'] ) . ' 2>/dev/null' );
+		// Save original URL as custom field.
+		update_post_meta( $post_id, 'original_url', $postData['original_url'] );
 
-		return $postId;
+		return (string) $post_id;
 	}
 
 	/**
@@ -498,7 +494,11 @@ class FC2Blog2WP {
 	 * @return array Map of old_url => ['url' => new_url, 'id' => attachment_id]
 	 */
 	public function importImage( $postId, $imagesUrl ) {
-		$imported = [];
+		require_once ABSPATH . 'wp-admin/includes/media.php';
+		require_once ABSPATH . 'wp-admin/includes/file.php';
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+
+		$imported = array();
 
 		foreach ( $imagesUrl as $image ) {
 			$src = isset( $image['src'] ) ? $image['src'] : '';
@@ -506,39 +506,30 @@ class FC2Blog2WP {
 				continue;
 			}
 
-			$output      = [];
-			$return_code = 0;
-			exec( 'wp media import ' . escapeshellarg( $src ) . ' --post_id=' . $postId . ' --porcelain 2>/dev/null', $output, $return_code );
-
-			$attachment_id = null;
-			foreach ( $output as $line ) {
-				if ( is_numeric( trim( $line ) ) ) {
-					$attachment_id = trim( $line );
-					break;
-				}
-			}
-
-			if ( ! $attachment_id ) {
+			$tmp = download_url( $src );
+			if ( is_wp_error( $tmp ) ) {
 				continue;
 			}
 
-			$new_url_output = [];
-			exec( 'wp post get ' . $attachment_id . ' --field=guid 2>/dev/null', $new_url_output );
+			$file_array = array(
+				'name'     => basename( wp_parse_url( $src, PHP_URL_PATH ) ),
+				'tmp_name' => $tmp,
+			);
 
-			$new_url = null;
-			foreach ( $new_url_output as $line ) {
-				$line = trim( $line );
-				if ( ! empty( $line ) && strpos( $line, 'http' ) === 0 ) {
-					$new_url = $line;
-					break;
-				}
+			$attachment_id = media_handle_sideload( $file_array, (int) $postId );
+			wp_delete_file( $tmp );
+
+			if ( is_wp_error( $attachment_id ) ) {
+				continue;
 			}
 
+			$new_url = wp_get_attachment_url( $attachment_id );
+
 			if ( $new_url ) {
-				$imported[ $src ] = [
+				$imported[ $src ] = array(
 					'url' => $new_url,
 					'id'  => (int) $attachment_id,
-				];
+				);
 			}
 		}
 
@@ -557,22 +548,13 @@ class FC2Blog2WP {
 			return;
 		}
 
-		$content_output = [];
-		exec( 'wp post get ' . $postId . ' --field=post_content 2>/dev/null', $content_output );
+		$current_content = get_post_field( 'post_content', (int) $postId );
 
-		// Filter out non-content lines (warnings etc.)
-		$content_output = array_filter( $content_output, function ( $line ) {
-			return strpos( $line, 'Failed loading' ) !== 0
-				&& strpos( $line, 'Warning:' ) !== 0
-				&& strpos( $line, 'Xdebug' ) !== 0;
-		} );
-
-		if ( empty( $content_output ) ) {
+		if ( false === $current_content || '' === $current_content ) {
 			return;
 		}
 
-		$current_content = implode( "\n", $content_output );
-		$new_content     = $current_content;
+		$new_content = $current_content;
 
 		foreach ( $importedImages as $old_url => $image_data ) {
 			$new_url       = $image_data['url'];
@@ -582,22 +564,24 @@ class FC2Blog2WP {
 				'<figure class="wp-block-image"><img src="' . $new_url . '" alt="" class="wp-image-' . $attachment_id . '"/></figure>' . "\n" .
 				'<!-- /wp:image -->';
 
-			// Replace wp:image block with old src
+			// Replace wp:image block with old src.
 			$new_content = preg_replace(
 				'/<!\-\- wp:image \-\->\s*<figure[^>]*><img[^>]*src=["\']' . preg_quote( $old_url, '/' ) . '["\'][^>]*><\/figure>\s*<!\-\- \/wp:image \-\->/is',
 				$replacement,
 				$new_content
 			);
 
-			// Also replace any remaining bare img tags or plain URLs
+			// Also replace any remaining bare img tags or plain URLs.
 			$new_content = str_replace( $old_url, $new_url, $new_content );
 		}
 
 		if ( $current_content !== $new_content ) {
-			$temp_file = $this->tempDir . '/content_' . $postId . '.txt';
-			file_put_contents( $temp_file, $new_content, LOCK_EX );
-			exec( 'wp post update ' . $postId . ' ' . escapeshellarg( $temp_file ) . ' 2>/dev/null' );
-			@unlink( $temp_file );
+			wp_update_post(
+				array(
+					'ID'           => (int) $postId,
+					'post_content' => $new_content,
+				)
+			);
 		}
 	}
 
@@ -609,30 +593,23 @@ class FC2Blog2WP {
 	 */
 	public function createComments( $postId, $commentsData ) {
 		foreach ( $commentsData as $comment ) {
-			$author  = isset( $comment['author'] ) ? $comment['author'] : '';
-			$date    = isset( $comment['date'] ) ? $comment['date'] : date( 'Y-m-d H:i:s' );
-			$text    = isset( $comment['text'] ) ? $comment['text'] : '';
+			$author = isset( $comment['author'] ) ? $comment['author'] : '';
+			$date   = isset( $comment['date'] ) ? $comment['date'] : gmdate( 'Y-m-d H:i:s' );
+			$text   = isset( $comment['text'] ) ? $comment['text'] : '';
 
 			if ( empty( $text ) ) {
 				continue;
 			}
 
-			exec(
-				'wp comment create' .
-				' --comment_post_ID=' . $postId .
-				' --comment_content=' . escapeshellarg( $text ) .
-				' --comment_author=' . escapeshellarg( $author ) .
-				' --comment_date=' . escapeshellarg( $date ) .
-				' 2>/dev/null'
+			wp_insert_comment(
+				array(
+					'comment_post_ID'  => (int) $postId,
+					'comment_content'  => $text,
+					'comment_author'   => $author,
+					'comment_date'     => $date,
+					'comment_approved' => 1,
+				)
 			);
 		}
-	}
-
-	/**
-	 * Write content to temp file
-	 * @param string $body
-	 */
-	public function putTempFile( $body ) {
-		file_put_contents( $this->tempDir . '/tmp.txt', $body, LOCK_EX );
 	}
 }
