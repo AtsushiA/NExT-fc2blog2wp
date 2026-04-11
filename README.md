@@ -88,6 +88,15 @@ fc2blog2wp/
 
 ## 変更履歴
 
+### 0.3.0
+
+- Gutenberg ブロック変換ロジックを全面改善
+  - FC2ブログの `div.entryText` 内フラット HTML を正しく変換するよう対応
+  - `processChildNodes()` を追加: `div` を再帰処理して子ノードをブロックに変換
+  - `inlinesToParagraphs()` を追加: `<br>` 区切りのインライン要素を段落ブロックに変換
+  - `<a><img></a>` パターンを画像ブロックとして正しく変換
+  - `<hr>` を区切りブロック（`wp:separator`）に変換
+
 ### 0.2.0
 
 - `exec()` + WP-CLI 子プロセス呼び出しを WordPress API に置き換え

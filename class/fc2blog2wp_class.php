@@ -282,50 +282,150 @@ class FC2Blog2WP {
 			return '<!-- wp:html -->' . $html . '<!-- /wp:html -->';
 		}
 
-		$blocks = '';
-		foreach ( $body->childNodes as $node ) {
-			$blocks .= $this->nodeToBlock( $dom, $node );
-		}
-
-		return trim( $blocks );
+		return trim( $this->processChildNodes( $dom, $body ) );
 	}
 
 	/**
-	 * Convert a single DOM node to a Gutenberg block
+	 * Process child nodes, grouping consecutive inline elements into paragraph blocks.
+	 *
+	 * @param DOMDocument $dom
+	 * @param DOMNode $parentNode
+	 * @return string
+	 */
+	private function processChildNodes( $dom, $parentNode ) {
+		$blocks       = '';
+		$inline_nodes = array();
+
+		$block_tags = array( 'p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'blockquote', 'table', 'figure', 'pre', 'hr' );
+
+		foreach ( $parentNode->childNodes as $node ) {
+			if ( $node->nodeType === XML_TEXT_NODE ) {
+				if ( '' !== trim( $node->textContent ) ) {
+					$inline_nodes[] = $node;
+				}
+				continue;
+			}
+
+			if ( $node->nodeType !== XML_ELEMENT_NODE ) {
+				continue;
+			}
+
+			$tag = strtolower( $node->nodeName );
+
+			// <br> acts as a paragraph separator within inline content.
+			if ( 'br' === $tag ) {
+				if ( ! empty( $inline_nodes ) ) {
+					$inline_nodes[] = $node;
+				}
+				continue;
+			}
+
+			// <a><img/></a> — link wrapping a single image: treat as image block.
+			if ( 'a' === $tag ) {
+				$imgs = $node->getElementsByTagName( 'img' );
+				if ( $imgs->length === 1 && '' === trim( $node->textContent ) ) {
+					if ( ! empty( $inline_nodes ) ) {
+						$blocks      .= $this->inlinesToParagraphs( $dom, $inline_nodes );
+						$inline_nodes = array();
+					}
+					$blocks .= $this->imgNodeToBlock( $imgs->item( 0 ) );
+					continue;
+				}
+				// Linked text — treat as inline.
+				$inline_nodes[] = $node;
+				continue;
+			}
+
+			if ( 'img' === $tag || in_array( $tag, $block_tags, true ) ) {
+				if ( ! empty( $inline_nodes ) ) {
+					$blocks      .= $this->inlinesToParagraphs( $dom, $inline_nodes );
+					$inline_nodes = array();
+				}
+				$blocks .= $this->nodeToBlock( $dom, $node );
+				continue;
+			}
+
+			// All other tags (span, strong, em, b, i, etc.) — treat as inline.
+			$inline_nodes[] = $node;
+		}
+
+		if ( ! empty( $inline_nodes ) ) {
+			$blocks .= $this->inlinesToParagraphs( $dom, $inline_nodes );
+		}
+
+		return $blocks;
+	}
+
+	/**
+	 * Convert a list of inline nodes (split by <br>) into paragraph blocks.
+	 *
+	 * @param DOMDocument $dom
+	 * @param array $nodes
+	 * @return string
+	 */
+	private function inlinesToParagraphs( $dom, $nodes ) {
+		$groups  = array();
+		$current = array();
+
+		foreach ( $nodes as $node ) {
+			if ( $node->nodeType === XML_ELEMENT_NODE && 'br' === strtolower( $node->nodeName ) ) {
+				if ( ! empty( $current ) ) {
+					$groups[] = $current;
+					$current  = array();
+				}
+			} else {
+				$current[] = $node;
+			}
+		}
+		if ( ! empty( $current ) ) {
+			$groups[] = $current;
+		}
+
+		$result = '';
+		foreach ( $groups as $group ) {
+			$inner = '';
+			foreach ( $group as $node ) {
+				$inner .= $dom->saveHTML( $node );
+			}
+			$inner = trim( $inner );
+			if ( '' !== $inner ) {
+				$result .= '<!-- wp:paragraph --><p>' . $inner . '</p><!-- /wp:paragraph -->' . "\n";
+			}
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Convert a single block-level DOM node to a Gutenberg block
 	 *
 	 * @param DOMDocument $dom
 	 * @param DOMNode $node
 	 * @return string
 	 */
 	private function nodeToBlock( $dom, $node ) {
-		// Text node
-		if ( $node->nodeType === XML_TEXT_NODE ) {
-			$text = trim( $node->textContent );
-			if ( empty( $text ) ) {
-				return '';
-			}
-			return '<!-- wp:paragraph --><p>' . esc_html( $text ) . '</p><!-- /wp:paragraph -->' . "\n";
-		}
-
 		if ( $node->nodeType !== XML_ELEMENT_NODE ) {
 			return '';
 		}
 
-		$tag      = strtolower( $node->nodeName );
-		$outer    = $dom->saveHTML( $node );
-		$inner    = '';
+		$tag   = strtolower( $node->nodeName );
+		$outer = $dom->saveHTML( $node );
+		$inner = '';
 		foreach ( $node->childNodes as $child ) {
 			$inner .= $dom->saveHTML( $child );
 		}
 
 		switch ( $tag ) {
+			case 'div':
+				return $this->processChildNodes( $dom, $node );
+
 			case 'p':
-				// Check if paragraph contains only an image
+				// Check if paragraph contains only an image.
 				$img_nodes = $node->getElementsByTagName( 'img' );
-				if ( $img_nodes->length === 1 && trim( $node->textContent ) === '' ) {
+				if ( $img_nodes->length === 1 && '' === trim( $node->textContent ) ) {
 					return $this->imgNodeToBlock( $img_nodes->item( 0 ) );
 				}
-				if ( empty( trim( $inner ) ) ) {
+				if ( '' === trim( $inner ) ) {
 					return '';
 				}
 				return '<!-- wp:paragraph -->' . $outer . '<!-- /wp:paragraph -->' . "\n";
@@ -351,13 +451,12 @@ class FC2Blog2WP {
 			case 'blockquote':
 				return '<!-- wp:quote --><blockquote class="wp-block-quote">' . $inner . '</blockquote><!-- /wp:quote -->' . "\n";
 
-			case 'br':
 			case 'hr':
-				return '';
+				return '<!-- wp:separator --><hr class="wp-block-separator"/><!-- /wp:separator -->' . "\n";
 
 			default:
 				$trimmed = trim( $outer );
-				if ( empty( $trimmed ) ) {
+				if ( '' === $trimmed ) {
 					return '';
 				}
 				return '<!-- wp:html -->' . $outer . '<!-- /wp:html -->' . "\n";
