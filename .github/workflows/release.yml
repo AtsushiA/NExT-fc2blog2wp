@@ -12,23 +12,33 @@ jobs:
   release:
     name: Build and publish plugin zip
     runs-on: ubuntu-latest
+    env:
+      PLUGIN_SLUG: NExT-fc2blog2wp
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          coverage: none
-          tools: wp-cli
-
       - name: Build distributable zip
         run: |
-          wp package install wp-cli/dist-archive-command:@stable --allow-root
-          wp dist-archive . "${{ github.workspace }}/NExT-fc2blog2wp.zip" --allow-root
+          STAGING="${RUNNER_TEMP}/${PLUGIN_SLUG}"
+          rm -rf "$STAGING"
+          mkdir -p "$STAGING"
+
+          # Build rsync excludes from .distignore (skip comments and blank lines).
+          EXCLUDES=( --exclude='.git' )
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            case "$line" in \#*) continue ;; esac
+            EXCLUDES+=( --exclude="$line" )
+          done < .distignore
+
+          rsync -a "${EXCLUDES[@]}" ./ "$STAGING/"
+          ( cd "$RUNNER_TEMP" && zip -r "${GITHUB_WORKSPACE}/${PLUGIN_SLUG}.zip" "$PLUGIN_SLUG" )
+
+          echo "--- zip contents ---"
+          unzip -l "${GITHUB_WORKSPACE}/${PLUGIN_SLUG}.zip"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: NExT-fc2blog2wp.zip
+          files: ${{ env.PLUGIN_SLUG }}.zip
           generate_release_notes: true
