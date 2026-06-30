@@ -5,7 +5,7 @@
  * @license GPL-2.0-or-later
  */
 
-class FC2Blog2WP_Command {
+class NExT_FC2Blog2WP_Command {
 
 	/**
 	 * Import FC2 BLOG posts to WordPress
@@ -51,7 +51,7 @@ class FC2Blog2WP_Command {
 		WP_CLI::log( 'Starting FC2 BLOG import...' );
 		WP_CLI::log( 'Blog URL: ' . $blog_url );
 
-		$fc2 = new FC2Blog2WP();
+		$fc2 = new NExT_FC2Blog2WP();
 
 		// Initialize temporary directory
 		if ( ! $fc2->initTempDir( $blog_url ) ) {

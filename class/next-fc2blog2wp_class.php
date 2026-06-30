@@ -1,11 +1,11 @@
 <?php
 /**
- * FC2Blog2WP core class
+ * NExT_FC2Blog2WP core class
  *
  * @license GPL-2.0-or-later
  */
 
-class FC2Blog2WP {
+class NExT_FC2Blog2WP {
 
 	/**
 	 * HTML Parser instance
@@ -60,7 +60,7 @@ class FC2Blog2WP {
 		}
 
 		$wp_content_dir   = defined( 'WP_CONTENT_DIR' ) ? WP_CONTENT_DIR : ABSPATH . 'wp-content';
-		$this->tempDir    = $wp_content_dir . '/fc2blog2wp/' . $this->blogId;
+		$this->tempDir    = $wp_content_dir . '/next-fc2blog2wp/' . $this->blogId;
 
 		if ( ! file_exists( $this->tempDir ) ) {
 			if ( ! wp_mkdir_p( $this->tempDir ) ) {

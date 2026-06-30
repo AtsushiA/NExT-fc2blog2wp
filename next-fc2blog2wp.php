@@ -1,6 +1,6 @@
 <?php
 /**
- * Plugin Name: FC2 BLOG to WordPress Importer
+ * Plugin Name: NExT FC2 BLOG to WordPress Importer
  * Plugin URI: https://next-season.net
  * Description: Import FC2 BLOG posts to WordPress via WP-CLI
  * Version: 0.3.0
@@ -8,7 +8,7 @@
  * Author URI: https://next-season.net
  * License: GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain: fc2blog2wp
+ * Text Domain: next-fc2blog2wp
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // Register WP-CLI command if WP-CLI is available
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
 	require_once __DIR__ . '/class/fc2_html_parser.php';
-	require_once __DIR__ . '/class/fc2blog2wp_class.php';
-	require_once __DIR__ . '/class/fc2blog2wp_command.php';
-	WP_CLI::add_command( 'fc2', 'FC2Blog2WP_Command' );
+	require_once __DIR__ . '/class/next-fc2blog2wp_class.php';
+	require_once __DIR__ . '/class/next-fc2blog2wp_command.php';
+	WP_CLI::add_command( 'fc2', 'NExT_FC2Blog2WP_Command' );
 }
