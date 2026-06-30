@@ -22,6 +22,12 @@ wp-content/cache/
 # Build
 *.min.js
 *.min.css
+/build/
+/NExT-fc2blog2wp.zip
+
+# Tests
+.phpunit.result.cache
+/tests/e2e/.auth/
 
 # Plugin temp data
 /tmp/

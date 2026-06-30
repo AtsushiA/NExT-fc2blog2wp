@@ -86,7 +86,39 @@ NExT-fc2blog2wp/
 └── README.md
 ```
 
+## 開発・テスト
+
+動作要件: **PHP 8.3 以上**。CI は PHP 8.3 / 8.4 × WordPress（最新・1世代前）のマトリクスで実行されます。
+
+```bash
+# 依存関係のインストール（開発用）
+composer install
+
+# コーディング規約チェック（WordPress Coding Standards）
+composer run phpcs        # チェック
+composer run phpcbf       # 自動修正
+
+# 単体テスト（WordPress 不要・ネットワーク不要）
+composer run test:unit
+
+# 統合テスト（WordPress テストスイートが必要）
+bash bin/install-wp-tests.sh wordpress_test root '' 127.0.0.1 latest
+composer run test:integration
+```
+
+- `tests/phpunit/unit/` … HTML パース・ブロック変換など純粋ロジックの単体テスト
+- `tests/phpunit/integration/` … `wp_insert_post()` 等 WordPress 依存処理の統合テスト
+- GitHub Actions: `.github/workflows/ci.yml`（phpcs / PHPUnit / Plugin Check）、`.github/workflows/release.yml`（`v0.0.0` タグで配布用 zip を Release に添付）
+
 ## 変更履歴
+
+### 0.4.0
+
+- PHP 8.3 / 8.4 対応（`mb_convert_encoding(..., 'HTML-ENTITIES')` を `mb_encode_numericentity()` に置き換え、非推奨警告を解消）
+- 開発・テスト基盤を整備
+  - phpcs（WordPress Coding Standards）/ PHPUnit（単体・統合）を追加
+  - GitHub Actions による CI（マトリクステスト・Plugin Check）と自動リリースを追加
+- 内部名を `NExT` ブランドへ統一（クラス名・ファイル名・テキストドメイン・一時データ保存先）
 
 ### 0.3.0
 

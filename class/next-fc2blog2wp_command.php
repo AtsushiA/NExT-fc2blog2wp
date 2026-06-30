@@ -1,10 +1,14 @@
 <?php
 /**
- * WP-CLI command for FC2 BLOG to WordPress import
+ * WP-CLI command for the NExT FC2 BLOG to WordPress Importer.
  *
+ * @package NExT_FC2Blog2WP
  * @license GPL-2.0-or-later
  */
 
+/**
+ * Registers and handles the `wp fc2 import` command.
+ */
 class NExT_FC2Blog2WP_Command {
 
 	/**
@@ -67,8 +71,8 @@ class NExT_FC2Blog2WP_Command {
 		}
 
 		// Load progress
-		$progress_data    = $fc2->loadProgress();
-		$completed_count  = count( $progress_data['completed_posts'] );
+		$progress_data   = $fc2->loadProgress();
+		$completed_count = count( $progress_data['completed_posts'] );
 
 		if ( $completed_count > 0 ) {
 			WP_CLI::log( 'Resuming from previous session...' );
@@ -100,9 +104,12 @@ class NExT_FC2Blog2WP_Command {
 		$fc2->saveProgress( $progress_data );
 
 		// Filter out completed posts
-		$remaining_posts = array_filter( $posts_url, function ( $url ) use ( $fc2, $progress_data ) {
-			return ! $fc2->isPostCompleted( $url, $progress_data );
-		} );
+		$remaining_posts = array_filter(
+			$posts_url,
+			function ( $url ) use ( $fc2, $progress_data ) {
+				return ! $fc2->isPostCompleted( $url, $progress_data );
+			}
+		);
 
 		if ( count( $remaining_posts ) === 0 ) {
 			WP_CLI::success( 'All posts already imported!' );

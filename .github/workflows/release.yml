@@ -1,0 +1,34 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish plugin zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+          tools: wp-cli
+
+      - name: Build distributable zip
+        run: |
+          wp package install wp-cli/dist-archive-command:@stable --allow-root
+          wp dist-archive . "${{ github.workspace }}/NExT-fc2blog2wp.zip" --allow-root
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: NExT-fc2blog2wp.zip
+          generate_release_notes: true
