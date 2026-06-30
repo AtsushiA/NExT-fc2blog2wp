@@ -1,32 +1,40 @@
 <?php
 /**
- * NExT_FC2Blog2WP core class
+ * Core import logic for the NExT FC2 BLOG to WordPress Importer.
  *
+ * @package NExT_FC2Blog2WP
  * @license GPL-2.0-or-later
  */
 
+/**
+ * Fetches, parses and imports FC2 blog posts into WordPress.
+ */
 class NExT_FC2Blog2WP {
 
 	/**
 	 * HTML Parser instance
+	 *
 	 * @var FC2HtmlParser
 	 */
 	private $parser;
 
 	/**
 	 * Blog ID extracted from blog URL (e.g. "recordeurasia")
+	 *
 	 * @var string
 	 */
 	private $blogId;
 
 	/**
 	 * Temporary directory path
+	 *
 	 * @var string
 	 */
 	private $tempDir;
 
 	/**
 	 * Progress file path
+	 *
 	 * @var string
 	 */
 	private $progressFile;
@@ -35,7 +43,7 @@ class NExT_FC2Blog2WP {
 	 * Constructor
 	 */
 	public function __construct() {
-		require_once dirname( __FILE__ ) . '/fc2_html_parser.php';
+		require_once __DIR__ . '/fc2_html_parser.php';
 		$this->parser       = new FC2HtmlParser();
 		$this->blogId       = '';
 		$this->tempDir      = '';
@@ -59,8 +67,8 @@ class NExT_FC2Blog2WP {
 			return false;
 		}
 
-		$wp_content_dir   = defined( 'WP_CONTENT_DIR' ) ? WP_CONTENT_DIR : ABSPATH . 'wp-content';
-		$this->tempDir    = $wp_content_dir . '/next-fc2blog2wp/' . $this->blogId;
+		$wp_content_dir = defined( 'WP_CONTENT_DIR' ) ? WP_CONTENT_DIR : ABSPATH . 'wp-content';
+		$this->tempDir  = $wp_content_dir . '/next-fc2blog2wp/' . $this->blogId;
 
 		if ( ! file_exists( $this->tempDir ) ) {
 			if ( ! wp_mkdir_p( $this->tempDir ) ) {
@@ -75,6 +83,7 @@ class NExT_FC2Blog2WP {
 
 	/**
 	 * Get temp directory path
+	 *
 	 * @return string
 	 */
 	public function getTempDir() {
@@ -83,25 +92,30 @@ class NExT_FC2Blog2WP {
 
 	/**
 	 * Load progress data
+	 *
 	 * @return array
 	 */
 	public function loadProgress() {
 		if ( ! file_exists( $this->progressFile ) ) {
-			return [
-				'completed_posts' => [],
+			return array(
+				'completed_posts' => array(),
 				'total_posts'     => 0,
 				'started_at'      => date( 'Y-m-d H:i:s' ),
-			];
+			);
 		}
 
 		$json = file_get_contents( $this->progressFile );
 		$data = json_decode( $json, true );
 
-		return $data ? $data : [ 'completed_posts' => [], 'total_posts' => 0 ];
+		return $data ? $data : array(
+			'completed_posts' => array(),
+			'total_posts'     => 0,
+		);
 	}
 
 	/**
 	 * Save progress data
+	 *
 	 * @param array $progress
 	 */
 	public function saveProgress( $progress ) {
@@ -120,21 +134,23 @@ class NExT_FC2Blog2WP {
 
 	/**
 	 * Check if a post URL has already been completed
+	 *
 	 * @param string $postUrl
-	 * @param array $progress
+	 * @param array  $progress
 	 * @return bool
 	 */
 	public function isPostCompleted( $postUrl, $progress ) {
-		return in_array( $postUrl, $progress['completed_posts'] );
+		return in_array( $postUrl, $progress['completed_posts'], true );
 	}
 
 	/**
 	 * Mark a post URL as completed
+	 *
 	 * @param string $postUrl
-	 * @param array &$progress
+	 * @param array  &$progress
 	 */
 	public function markPostCompleted( $postUrl, &$progress ) {
-		if ( ! in_array( $postUrl, $progress['completed_posts'] ) ) {
+		if ( ! in_array( $postUrl, $progress['completed_posts'], true ) ) {
 			$progress['completed_posts'][] = $postUrl;
 			$this->saveProgress( $progress );
 		}
@@ -142,6 +158,7 @@ class NExT_FC2Blog2WP {
 
 	/**
 	 * Get archive index URL (= the blog top page)
+	 *
 	 * @param string $blogUrl
 	 * @return string|false
 	 */
@@ -165,7 +182,7 @@ class NExT_FC2Blog2WP {
 	 * @return array
 	 */
 	public function getArchivesUrl( $indexUrl ) {
-		$archivesUrl = [ $indexUrl ];
+		$archivesUrl = array( $indexUrl );
 
 		$html = $this->parser->fetchHtml( $indexUrl );
 		if ( $html === false ) {
@@ -175,7 +192,7 @@ class NExT_FC2Blog2WP {
 		$monthlyUrls = $this->parser->extractMonthlyArchiveUrls( $html, $indexUrl );
 
 		foreach ( $monthlyUrls as $url ) {
-			if ( ! in_array( $url, $archivesUrl ) ) {
+			if ( ! in_array( $url, $archivesUrl, true ) ) {
 				$archivesUrl[] = $url;
 			}
 		}
@@ -191,8 +208,8 @@ class NExT_FC2Blog2WP {
 	 * @return array
 	 */
 	public function getPostsUrl( $archivesUrl ) {
-		$postsUrl = [];
-		$seen     = [];
+		$postsUrl = array();
+		$seen     = array();
 
 		foreach ( $archivesUrl as $archiveUrl ) {
 			// Fetch pages with pagination until no new posts found
@@ -209,9 +226,9 @@ class NExT_FC2Blog2WP {
 				$added = 0;
 				foreach ( $newUrls as $postUrl ) {
 					if ( ! isset( $seen[ $postUrl ] ) ) {
-						$postsUrl[]          = $postUrl;
-						$seen[ $postUrl ]    = true;
-						$added++;
+						$postsUrl[]       = $postUrl;
+						$seen[ $postUrl ] = true;
+						++$added;
 					}
 				}
 
@@ -248,7 +265,7 @@ class NExT_FC2Blog2WP {
 			return false;
 		}
 
-		return [
+		return array(
 			'title'        => $title,
 			'content'      => $this->convertToBlocks( $body ),
 			'raw_content'  => $body,
@@ -257,7 +274,7 @@ class NExT_FC2Blog2WP {
 			'tags'         => $tags,
 			'comments'     => $comments,
 			'original_url' => $postUrl,
-		];
+		);
 	}
 
 	/**
@@ -289,7 +306,7 @@ class NExT_FC2Blog2WP {
 	 * Process child nodes, grouping consecutive inline elements into paragraph blocks.
 	 *
 	 * @param DOMDocument $dom
-	 * @param DOMNode $parentNode
+	 * @param DOMNode     $parentNode
 	 * @return string
 	 */
 	private function processChildNodes( $dom, $parentNode ) {
@@ -360,7 +377,7 @@ class NExT_FC2Blog2WP {
 	 * Convert a list of inline nodes (split by <br>) into paragraph blocks.
 	 *
 	 * @param DOMDocument $dom
-	 * @param array $nodes
+	 * @param array       $nodes
 	 * @return string
 	 */
 	private function inlinesToParagraphs( $dom, $nodes ) {
@@ -400,7 +417,7 @@ class NExT_FC2Blog2WP {
 	 * Convert a single block-level DOM node to a Gutenberg block
 	 *
 	 * @param DOMDocument $dom
-	 * @param DOMNode $node
+	 * @param DOMNode     $node
 	 * @return string
 	 */
 	private function nodeToBlock( $dom, $node ) {
@@ -550,12 +567,14 @@ class NExT_FC2Blog2WP {
 	 * @return array Array of image data [['src' => url], ...]
 	 */
 	public function getImagesUrl( $postContent ) {
-		$imagesUrl = [];
-		$seen      = [];
+		$imagesUrl = array();
+		$seen      = array();
 
 		$dom = new DOMDocument();
+		// mb_encode_numericentity replaces the deprecated mb_convert_encoding(..., 'HTML-ENTITIES').
+		$encoded = mb_encode_numericentity( $postContent, array( 0x80, 0x10FFFF, 0, 0x1FFFFF ), 'UTF-8' );
 		@$dom->loadHTML(
-			mb_convert_encoding( $postContent, 'HTML-ENTITIES', 'UTF-8' ),
+			$encoded,
 			LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
 		);
 
@@ -579,7 +598,7 @@ class NExT_FC2Blog2WP {
 			}
 
 			$seen[ $src ] = true;
-			$imagesUrl[]  = [ 'src' => $src ];
+			$imagesUrl[]  = array( 'src' => $src );
 		}
 
 		return $imagesUrl;
@@ -589,7 +608,7 @@ class NExT_FC2Blog2WP {
 	 * Import images to WordPress media library
 	 *
 	 * @param string $postId
-	 * @param array $imagesUrl
+	 * @param array  $imagesUrl
 	 * @return array Map of old_url => ['url' => new_url, 'id' => attachment_id]
 	 */
 	public function importImage( $postId, $imagesUrl ) {
@@ -640,7 +659,7 @@ class NExT_FC2Blog2WP {
 	 * Also converts img tags to proper wp:image blocks
 	 *
 	 * @param string $postId
-	 * @param array $importedImages [old_url => ['url' => new_url, 'id' => attachment_id]]
+	 * @param array  $importedImages [old_url => ['url' => new_url, 'id' => attachment_id]]
 	 */
 	public function searchReplace( $postId, $importedImages ) {
 		if ( empty( $importedImages ) ) {
@@ -688,7 +707,7 @@ class NExT_FC2Blog2WP {
 	 * Create comments for a post
 	 *
 	 * @param string $postId
-	 * @param array $commentsData
+	 * @param array  $commentsData
 	 */
 	public function createComments( $postId, $commentsData ) {
 		foreach ( $commentsData as $comment ) {

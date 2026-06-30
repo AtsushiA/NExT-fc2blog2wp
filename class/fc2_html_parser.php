@@ -1,11 +1,14 @@
 <?php
 /**
- * HTML Parser for FC2 BLOG
- * Uses DOMDocument for parsing FC2 blog pages
+ * HTML parser for FC2 BLOG pages.
  *
+ * @package NExT_FC2Blog2WP
  * @license GPL-2.0-or-later
  */
 
+/**
+ * Parses FC2 blog pages using DOMDocument.
+ */
 class FC2HtmlParser {
 
 	/**
@@ -15,13 +18,15 @@ class FC2HtmlParser {
 	 * @return string|false HTML content or false on failure
 	 */
 	public function fetchHtml( $url ) {
-		$context = stream_context_create( [
-			'http' => [
-				'method'  => 'GET',
-				'header'  => "User-Agent: Mozilla/5.0 (compatible; FC2Blog2WP/1.0)\r\n",
-				'timeout' => 30,
-			],
-		] );
+		$context = stream_context_create(
+			array(
+				'http' => array(
+					'method'  => 'GET',
+					'header'  => "User-Agent: Mozilla/5.0 (compatible; FC2Blog2WP/1.0)\r\n",
+					'timeout' => 30,
+				),
+			)
+		);
 
 		$html = @file_get_contents( $url, false, $context );
 		return $html !== false ? $html : false;
@@ -39,7 +44,10 @@ class FC2HtmlParser {
 		}
 
 		$dom = new DOMDocument();
-		@$dom->loadHTML( mb_convert_encoding( $html, 'HTML-ENTITIES', 'UTF-8' ), LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD );
+		// Convert non-ASCII characters to numeric HTML entities so DOMDocument treats
+		// the markup as UTF-8. Replaces the deprecated mb_convert_encoding(..., 'HTML-ENTITIES').
+		$encoded = mb_encode_numericentity( $html, array( 0x80, 0x10FFFF, 0, 0x1FFFFF ), 'UTF-8' );
+		@$dom->loadHTML( $encoded, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD );
 
 		return $dom;
 	}
@@ -58,7 +66,7 @@ class FC2HtmlParser {
 	 * Find elements by XPath query
 	 *
 	 * @param DOMXPath $xpath
-	 * @param string $query
+	 * @param string   $query
 	 * @return DOMNodeList
 	 */
 	public function query( $xpath, $query ) {
@@ -79,7 +87,7 @@ class FC2HtmlParser {
 	 * Get attribute from element
 	 *
 	 * @param DOMNode $node
-	 * @param string $attr
+	 * @param string  $attr
 	 * @return string
 	 */
 	public function getAttribute( $node, $attr ) {
@@ -90,7 +98,7 @@ class FC2HtmlParser {
 	 * Get inner HTML content from element
 	 *
 	 * @param DOMDocument $dom
-	 * @param DOMNode $node
+	 * @param DOMNode     $node
 	 * @return string
 	 */
 	public function getHtmlContent( $dom, $node ) {
@@ -256,11 +264,11 @@ class FC2HtmlParser {
 	public function extractTags( $html ) {
 		$dom = $this->parseHtml( $html );
 		if ( ! $dom ) {
-			return [];
+			return array();
 		}
 
 		$xpath = $this->createXPath( $dom );
-		$tags  = [];
+		$tags  = array();
 
 		$nodes = $this->query( $xpath, '//*[contains(@class, "entryTag_list")]//a' );
 		foreach ( $nodes as $node ) {
@@ -283,11 +291,11 @@ class FC2HtmlParser {
 	public function extractComments( $html ) {
 		$dom = $this->parseHtml( $html );
 		if ( ! $dom ) {
-			return [];
+			return array();
 		}
 
 		$xpath    = $this->createXPath( $dom );
-		$comments = [];
+		$comments = array();
 
 		$items = $this->query( $xpath, '//*[contains(@class, "commentList_item")]' );
 
@@ -316,11 +324,11 @@ class FC2HtmlParser {
 				$parsed_date = sprintf( '%04d-%02d-%02d 00:00:00', $dm[1], $dm[2], $dm[3] );
 			}
 
-			$comments[] = [
+			$comments[] = array(
 				'author' => $author,
 				'date'   => $parsed_date,
 				'text'   => $text,
-			];
+			);
 		}
 
 		return $comments;
@@ -337,12 +345,12 @@ class FC2HtmlParser {
 	public function extractMonthlyArchiveUrls( $html, $base_url ) {
 		$dom = $this->parseHtml( $html );
 		if ( ! $dom ) {
-			return [];
+			return array();
 		}
 
 		$xpath = $this->createXPath( $dom );
-		$urls  = [];
-		$seen  = [];
+		$urls  = array();
+		$seen  = array();
 
 		$links = $this->query( $xpath, '//a[contains(@href, "blog-date-")]' );
 
@@ -355,7 +363,7 @@ class FC2HtmlParser {
 			$href = $this->toAbsoluteUrl( $href, $base_url );
 
 			if ( ! isset( $seen[ $href ] ) ) {
-				$urls[]       = $href;
+				$urls[]        = $href;
 				$seen[ $href ] = true;
 			}
 		}
@@ -374,12 +382,12 @@ class FC2HtmlParser {
 	public function extractPostUrls( $html, $base_url ) {
 		$dom = $this->parseHtml( $html );
 		if ( ! $dom ) {
-			return [];
+			return array();
 		}
 
 		$xpath = $this->createXPath( $dom );
-		$urls  = [];
-		$seen  = [];
+		$urls  = array();
+		$seen  = array();
 
 		$links = $this->query( $xpath, '//a[contains(@href, "blog-entry-")]' );
 
@@ -399,7 +407,7 @@ class FC2HtmlParser {
 			$href = $this->toAbsoluteUrl( $href, $base_url );
 
 			if ( ! isset( $seen[ $href ] ) ) {
-				$urls[]       = $href;
+				$urls[]        = $href;
 				$seen[ $href ] = true;
 			}
 		}

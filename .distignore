@@ -1,0 +1,32 @@
+# Files and directories that must NOT ship in the distributable plugin zip.
+
+# VCS / CI
+/.git
+/.github
+/.gitignore
+/.distignore
+
+# Dev tooling
+/bin
+/tests
+/node_modules
+/vendor
+/composer.json
+/composer.lock
+/package.json
+/package-lock.json
+/phpcs.xml.dist
+/phpunit.xml.dist
+/.phpunit.result.cache
+
+# Dev docs
+/SPEC.md
+
+# OS / editor cruft
+.DS_Store
+*.swp
+*.swo
+
+# Build artifacts
+/build
+/NExT-fc2blog2wp.zip
