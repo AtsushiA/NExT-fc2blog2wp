@@ -106,6 +106,21 @@ bash bin/install-wp-tests.sh wordpress_test root '' 127.0.0.1 latest
 composer run test:integration
 ```
 
+統合テストは **Docker + wp-env** でも実行できます（`.wp-env.json` は PHP 8.4 / 最新 WP 設定済み）。
+
+```bash
+# Docker を起動しておくこと
+npx @wordpress/env start
+
+# 統合テスト（実 WordPress・実 DB、tests-cli コンテナ内で実行）
+npx @wordpress/env run tests-cli --env-cwd=wp-content/plugins/NExT-fc2blog2wp \
+  vendor/bin/phpunit --testsuite integration --bootstrap tests/phpunit/bootstrap.php
+
+# 単体テストも同様に実行可能
+npx @wordpress/env run tests-cli --env-cwd=wp-content/plugins/NExT-fc2blog2wp \
+  vendor/bin/phpunit --testsuite unit
+```
+
 - `tests/phpunit/unit/` … HTML パース・ブロック変換など純粋ロジックの単体テスト
 - `tests/phpunit/integration/` … `wp_insert_post()` 等 WordPress 依存処理の統合テスト
 - GitHub Actions: `.github/workflows/ci.yml`（phpcs / PHPUnit / Plugin Check）、`.github/workflows/release.yml`（`v0.0.0` タグで配布用 zip を Release に添付）
