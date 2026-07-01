@@ -29,5 +29,8 @@ wp-content/cache/
 .phpunit.result.cache
 /tests/e2e/.auth/
 
+# wp-env (local override only; .wp-env.json is committed)
+.wp-env.override.json
+
 # Plugin temp data
 /tmp/
